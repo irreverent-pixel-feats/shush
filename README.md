@@ -4,7 +4,7 @@
 
 This is for actually shelling out (which is pretty "savage").
 
-And it tries to follow the same `withBinaryFile ...` like pattern you might use when you read files.
+It tries to follow the same `withBinaryFile ...` like pattern you might use when you read files.
 
 Other options that take the "we'll provide actual functions that are named similar to unix shell commands
 and do similar things without shelling out":
