@@ -3,7 +3,7 @@
 -- |
 -- Module       : Shush
 -- Copyright    : (C) 2017 Irreverent Pixel Feats
--- License      : BSD-style (see the file etc/LICENSE.md)
+-- License      : BSD-style (see the file /LICENSE.md)
 -- Maintainer   : Dom De Re
 --
 -------------------------------------------------------------------
