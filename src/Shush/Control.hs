@@ -42,7 +42,7 @@ import qualified Data.ByteString as BS
 import System.Directory (doesDirectoryExist, getCurrentDirectory)
 import System.Environment (getEnvironment)
 import System.Exit (ExitCode(..))
-import System.IO (Handle, hClose)
+import System.IO (Handle)
 import System.IO.Error (IOError)
 import System.Process (CmdSpec(..), CreateProcess(..), StdStream(..), createProcess, waitForProcess)
 
@@ -176,7 +176,7 @@ withInputStream cmd f =
     let environ     = over (mapped . both) T.unpack environ'
     let proc        = CreateProcess (RawCommand rawExec rawArgs) (pure cdr) (pure environ) CreatePipe Inherit Inherit False False False False False False Nothing Nothing False
     let open        = (liftIO $ createProcess proc)
-    let close       = \(Just inp, _, _, p) -> (liftIO $ hClose inp >> waitForProcess p)
+    let close       = \(_, _, _, p) -> (liftIO $ waitForProcess p)
     flip catch handler . ebracket open close $ \(Just inp, _, _, p) -> do
       x               <- _runShT $ f (InStream inp)
       -- This will get called twice..
