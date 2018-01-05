@@ -1,7 +1,7 @@
 name:               irreverent-shush
 version:            0.0.1
 license:            BSD3
-license-file:       etc/LICENSE.md
+license-file:       LICENSE.md
 author:             Dom De Re
 maintainer:         Dom De Re
 copyright:          Copyright (C) 2017 Irreverent Pixel Feats
