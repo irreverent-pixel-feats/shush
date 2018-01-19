@@ -12,7 +12,6 @@ module Shush.Control (
   -- * Types
     ShT
   -- * Functions
-  , hPutCmdLn
   , readStderr
   , readStdout
   , runShT
@@ -25,6 +24,7 @@ module Shush.Control (
   ) where
 
 import Shush.Data
+import Shush.Data.Environment
 
 --import Ultra.Control.Lens ( Lens', Traversal', (.=), both, over, mapped, lens, selected, use, view )
 import Ultra.Control.Lens ((.=), both, over, mapped, use)
@@ -33,16 +33,16 @@ import Ultra.Control.Monad.Catch (MonadCatch(..), MonadThrow(..))
 import Ultra.Control.Monad.Trans.Either (EitherT, left, runEitherT)
 import qualified Ultra.Data.Text as T
 import qualified Ultra.Data.Text.Encoding as T
-import qualified Ultra.Data.Text.IO as T
 
 import Control.Monad.Morph (MFunctor(..))
 
 import qualified Data.ByteString as BS
+import qualified Data.HashMap.Strict as H
+import Data.Validation (AccValidation(..))
 
 import System.Directory (doesDirectoryExist, getCurrentDirectory)
 import System.Environment (getEnvironment)
 import System.Exit (ExitCode(..))
-import System.IO (Handle)
 import System.IO.Error (IOError)
 import System.Process (CmdSpec(..), CreateProcess(..), StdStream(..), createProcess, waitForProcess)
 
@@ -97,9 +97,12 @@ runSync cmd =
   in ShT $ do
     inp             <- maybe Inherit (UseHandle . inHandle) <$> use inputStream
     cdr             <- T.unpack <$> use currentWorkingDirectory
-    environ'        <- use environment
-    let environ     = over (mapped . both) T.unpack environ'
-    let proc        = CreateProcess (RawCommand rawExec rawArgs) (pure cdr) (pure environ) inp Inherit Inherit False False False False False False Nothing Nothing False
+    parentEnv       <- use environment
+    let childEnv'   = buildChildEnvironmentFromParent (shellEnv cmd) (H.fromList parentEnv)
+    childEnv        <- case childEnv' of
+      AccSuccess x -> pure . over (mapped . both) T.unpack $ x
+      AccFailure e -> left $ MissingEnvironmentVariables e
+    let proc        = CreateProcess (RawCommand rawExec rawArgs) (pure cdr) (pure childEnv) inp Inherit Inherit False False False False False False Nothing Nothing False
     (_, _, _, p)    <- (liftIO $ createProcess proc) `catch` handler
     exitcode        <- (liftIO $ waitForProcess p) `catch` handler
     case exitcode of
@@ -122,9 +125,12 @@ withProcOutPipes cmd f =
   in ShT $ do
     inp                     <- maybe Inherit (UseHandle . inHandle) <$> use inputStream
     cdr                     <- T.unpack <$> use currentWorkingDirectory
-    environ'                <- use environment
-    let environ             = over (mapped . both) T.unpack environ'
-    let proc                = CreateProcess (RawCommand rawExec rawArgs) (pure cdr) (pure environ) inp CreatePipe CreatePipe False False False False False False Nothing Nothing False
+    parentEnv               <- use environment
+    let childEnv'           = buildChildEnvironmentFromParent (shellEnv cmd) (H.fromList parentEnv)
+    childEnv                <- case childEnv' of
+      AccSuccess x -> pure . over (mapped . both) T.unpack $ x
+      AccFailure e -> left $ MissingEnvironmentVariables e
+    let proc                = CreateProcess (RawCommand rawExec rawArgs) (pure cdr) (pure childEnv) inp CreatePipe CreatePipe False False False False False False Nothing Nothing False
     let open                = (liftIO $ createProcess proc)
     let close (_, _, _, p)  = liftIO $ waitForProcess p
     flip catch handler . ebracket open close $ \(_, Just outp, Just errp, p) -> do
@@ -172,9 +178,12 @@ withInputStream cmd f =
 
   in ShT $ do
     cdr             <- T.unpack <$> use currentWorkingDirectory
-    environ'        <- use environment
-    let environ     = over (mapped . both) T.unpack environ'
-    let proc        = CreateProcess (RawCommand rawExec rawArgs) (pure cdr) (pure environ) CreatePipe Inherit Inherit False False False False False False Nothing Nothing False
+    parentEnv       <- use environment
+    let childEnv'   = buildChildEnvironmentFromParent (shellEnv cmd) (H.fromList parentEnv)
+    childEnv        <- case childEnv' of
+      AccSuccess x -> pure . over (mapped . both) T.unpack $ x
+      AccFailure e -> left $ MissingEnvironmentVariables e
+    let proc        = CreateProcess (RawCommand rawExec rawArgs) (pure cdr) (pure childEnv) CreatePipe Inherit Inherit False False False False False False Nothing Nothing False
     let open        = (liftIO $ createProcess proc)
     let close       = \(_, _, _, p) -> (liftIO $ waitForProcess p)
     flip catch handler . ebracket open close $ \(Just inp, _, _, p) -> do
@@ -188,12 +197,6 @@ withInputStream cmd f =
       case exitcode of
         ExitFailure c   -> left $ CommandFailed c
         ExitSuccess     -> pure x
-
--- |
--- pushes a command into an established pipe
---
-hPutCmdLn :: (MonadIO m) => Handle -> ShellCommand -> m ()
-hPutCmdLn h = liftIO . T.hPutStrLn h . textCmd
 
 -- runs a command synchronously and returns the stdout output in its entirety as Text
 readStdout
