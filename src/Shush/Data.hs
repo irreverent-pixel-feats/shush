@@ -23,7 +23,6 @@ module Shush.Data (
   , errHandle
   , outHandle
   , textArg
-  , textCmd
   , renderSyncShellError
   -- * Lenses and Traversals
   , currentWorkingDirectory
@@ -31,6 +30,8 @@ module Shush.Data (
   , envvar
   , inputStream
   ) where
+
+import Shush.Data.Environment
 
 import Ultra.Control.Lens ( Lens', Traversal', lens, selected )
 import qualified Ultra.Data.Text as T
@@ -41,9 +42,10 @@ import System.IO.Error ( IOError )
 import Preamble
 
 data SyncShellError =
-    CallFailed IOError
-  | CommandFailed Int
-  | DirectoryDoesNotExist T.Text
+    CallFailed !IOError
+  | CommandFailed !Int
+  | DirectoryDoesNotExist !T.Text
+  | MissingEnvironmentVariables !(NonEmpty T.Text)
     deriving (Show, Eq)
 
 data ShellContext = ShellContext {
@@ -64,12 +66,10 @@ textArg (QuoteEnclosed t)       = T.bracketed "'" "'" t
 textArg (DoubleQuoteEnclosed t) = T.bracketed "\"" "\"" t
 
 data ShellCommand = ShellCommand {
-    shellBin        :: T.Text
-  , shellCmdArgs    :: [ShellCommandArg]
-  } deriving (Show, Eq)
-
-textCmd :: ShellCommand -> T.Text
-textCmd (ShellCommand c as)= T.intercalate " " $ c : (textArg <$> as)
+    shellEnv        :: !ChildEnvironment
+  , shellBin        :: !T.Text
+  , shellCmdArgs    :: ![ShellCommandArg]
+  }
 
 newtype InStream    = InStream Handle deriving (Show, Eq)
 newtype OutStream   = OutStream Handle deriving (Show, Eq)
@@ -85,9 +85,10 @@ errHandle :: ErrStream -> Handle
 errHandle (ErrStream h) = h
 
 renderSyncShellError :: SyncShellError -> T.Text
-renderSyncShellError (CallFailed e)                 = "IO Error: " <> (T.pack . show $ e)
-renderSyncShellError (CommandFailed code)           = "Received non-zero error code: " <> (T.pack . show $ code)
-renderSyncShellError (DirectoryDoesNotExist dir)    = "Directory Doesn't Exist: " <> dir
+renderSyncShellError (CallFailed e)                     = "IO Error: " <> (T.pack . show $ e)
+renderSyncShellError (CommandFailed code)               = "Received non-zero error code: " <> (T.pack . show $ code)
+renderSyncShellError (DirectoryDoesNotExist dir)        = "Directory Doesn't Exist: " <> dir
+renderSyncShellError (MissingEnvironmentVariables names) = T.bracketedList "Required Environment Variables were not set: [" "]" ", " . toList $ names
 
 currentWorkingDirectory :: Lens' ShellContext T.Text
 currentWorkingDirectory = lens _cwd $ \c cwd' -> c { _cwd = cwd' }

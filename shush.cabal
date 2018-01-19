@@ -39,6 +39,8 @@ library
                     ,   ultra-lens
                     ,   ultra-text
                     ,   unix                    == 2.7.*
+                    ,   unordered-containers    == 0.2.*
+                    ,   validation              == 0.6.*
 
     ghc-options:        -Wall
 
@@ -47,6 +49,7 @@ library
     exposed-modules:    Shush
                         Shush.Control
                         Shush.Data
+                        Shush.Data.Environment
 
 test-suite              test
     default-language:   Haskell2010
