@@ -29,7 +29,7 @@ library
                     ,   containers
                     ,   array
                     ,   bytestring              == 0.10.*
-                    ,   directory               == 1.2.*
+                    ,   directory               >= 1.2          && < 1.4
                     ,   mmorph                  == 1.0.*
                     ,   domdere-preamble
                     ,   process                 == 1.6.*
