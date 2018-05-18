@@ -23,7 +23,7 @@ module Shush.Data.Environment (
 import qualified Ultra.Data.Text as T
 
 import qualified Data.HashMap.Strict as M
-import Data.Validation (AccValidation(..))
+import Data.Validation (Validation(..))
 
 import Preamble
 
@@ -50,13 +50,13 @@ infixr 4 .::
 -- Combine them with the Monoid instance.
 --
 newtype ChildEnvironment = ChildEnvironment {
-    _buildChildEnvironmentFromParent :: M.HashMap T.Text T.Text -> AccValidation (NonEmpty T.Text) [(T.Text, T.Text)]
+    _buildChildEnvironmentFromParent :: M.HashMap T.Text T.Text -> Validation (NonEmpty T.Text) [(T.Text, T.Text)]
   }
 
 buildChildEnvironmentFromParent
   :: ChildEnvironment
   -> M.HashMap T.Text T.Text
-  -> AccValidation (NonEmpty T.Text) [(T.Text, T.Text)]
+  -> Validation (NonEmpty T.Text) [(T.Text, T.Text)]
 buildChildEnvironmentFromParent = _buildChildEnvironmentFromParent
 
 instance Monoid ChildEnvironment where
@@ -72,14 +72,14 @@ instance Monoid ChildEnvironment where
 -- It fails if the variable is not set in the parent environment
 (.->) :: T.Text -> T.Text -> ChildEnvironment
 parName .-> childName = ChildEnvironment $
-  maybe (AccFailure (pure parName)) (pure . pure . ((,) childName)) . M.lookup parName
+  maybe (Failure (pure parName)) (pure . pure . (,) childName) . M.lookup parName
 
 -- | A var from the Parent environment is mapped to a var in the child environment
 -- of a distinct name
 -- If the var is not set in the parent environment, it is not added to the child environment
 (.?>) :: T.Text -> T.Text -> ChildEnvironment
 parName .?> childName = ChildEnvironment $
-  maybe (pure []) (pure . pure . ((,) childName)) . M.lookup parName
+  pure . maybe [] (pure . (,) childName) . M.lookup parName
 
 -- | Adds a new environment variable to the child environment
 (.::) :: T.Text -> T.Text -> ChildEnvironment

@@ -38,7 +38,7 @@ import Control.Monad.Morph (MFunctor(..))
 
 import qualified Data.ByteString as BS
 import qualified Data.HashMap.Strict as H
-import Data.Validation (AccValidation(..))
+import Data.Validation (Validation(..))
 
 import System.Directory (doesDirectoryExist, getCurrentDirectory)
 import System.Environment (getEnvironment)
@@ -66,7 +66,7 @@ instance MonadTrans ShT where
 getShellContext :: (MonadIO m) => m ShellContext
 getShellContext = ShellContext
   <$> over mapped T.pack (liftIO getCurrentDirectory)
-  <*> (over (mapped . mapped . both) T.pack $ liftIO getEnvironment)
+  <*> over (mapped . mapped . both) T.pack (liftIO getEnvironment)
   <*> pure Nothing
 
 runShT :: (MonadIO m) => ShT m a -> m (Either SyncShellError a)
@@ -88,9 +88,6 @@ runSync
   -> ShT m ()
 runSync cmd =
   let
-    rawExec :: String
-    rawExec = T.unpack . shellBin $ cmd
-
     rawArgs :: [String]
     rawArgs = fmap (T.unpack . textArg) . shellCmdArgs $ cmd
 
@@ -100,14 +97,17 @@ runSync cmd =
     parentEnv       <- use environment
     let childEnv'   = buildChildEnvironmentFromParent (shellEnv cmd) (H.fromList parentEnv)
     childEnv        <- case childEnv' of
-      AccSuccess x -> pure . over (mapped . both) T.unpack $ x
-      AccFailure e -> left $ MissingEnvironmentVariables e
-    let proc        = CreateProcess (RawCommand rawExec rawArgs) (pure cdr) (pure childEnv) inp Inherit Inherit False False False False False False Nothing Nothing False
+      Success x -> pure . over (mapped . both) T.unpack $ x
+      Failure e -> left $ MissingEnvironmentVariables e
+    let proc        = CreateProcess (RawCommand (rawExec cmd) rawArgs) (pure cdr) (pure childEnv) inp Inherit Inherit False False False False False False Nothing Nothing False
     (_, _, _, p)    <- (liftIO $ createProcess proc) `catch` handler
     exitcode        <- (liftIO $ waitForProcess p) `catch` handler
     case exitcode of
       ExitFailure c   -> left $ CommandFailed c
       ExitSuccess     -> pure ()
+
+rawExec :: ShellCommand -> String
+rawExec = T.unpack . shellBin
 
 withProcOutPipes
   :: (MonadIO m, MonadBracket m, MonadCatch m)
@@ -116,9 +116,6 @@ withProcOutPipes
   -> ShT m a
 withProcOutPipes cmd f =
   let
-    rawExec :: String
-    rawExec = T.unpack . shellBin $ cmd
-
     rawArgs :: [String]
     rawArgs = fmap (T.unpack . textArg) . shellCmdArgs $ cmd
 
@@ -128,9 +125,9 @@ withProcOutPipes cmd f =
     parentEnv               <- use environment
     let childEnv'           = buildChildEnvironmentFromParent (shellEnv cmd) (H.fromList parentEnv)
     childEnv                <- case childEnv' of
-      AccSuccess x -> pure . over (mapped . both) T.unpack $ x
-      AccFailure e -> left $ MissingEnvironmentVariables e
-    let proc                = CreateProcess (RawCommand rawExec rawArgs) (pure cdr) (pure childEnv) inp CreatePipe CreatePipe False False False False False False Nothing Nothing False
+      Success x -> pure . over (mapped . both) T.unpack $ x
+      Failure e -> left $ MissingEnvironmentVariables e
+    let proc                = CreateProcess (RawCommand (rawExec cmd) rawArgs) (pure cdr) (pure childEnv) inp CreatePipe CreatePipe False False False False False False Nothing Nothing False
     let open                = (liftIO $ createProcess proc)
     let close (_, _, _, p)  = liftIO $ waitForProcess p
     flip catch handler . ebracket open close $ \(_, Just outp, Just errp, p) -> do
@@ -140,7 +137,7 @@ withProcOutPipes cmd f =
       -- But from looking at the implementation for `waitForProcess` i think its ok,
       -- seems to handle the case where its already closed...
       -- At the time of this writing it also seemed to work fine in practice...
-      exitcode        <- (liftIO $ waitForProcess p) `catch` handler
+      exitcode        <- liftIO (waitForProcess p) `catch` handler
       case exitcode of
         ExitFailure c   -> left $ CommandFailed c
         ExitSuccess     -> pure x
@@ -170,9 +167,6 @@ withInputStream
   -> ShT m a
 withInputStream cmd f =
   let
-    rawExec :: String
-    rawExec = T.unpack . shellBin $ cmd
-
     rawArgs :: [String]
     rawArgs = fmap (T.unpack . textArg) . shellCmdArgs $ cmd
 
@@ -181,9 +175,9 @@ withInputStream cmd f =
     parentEnv       <- use environment
     let childEnv'   = buildChildEnvironmentFromParent (shellEnv cmd) (H.fromList parentEnv)
     childEnv        <- case childEnv' of
-      AccSuccess x -> pure . over (mapped . both) T.unpack $ x
-      AccFailure e -> left $ MissingEnvironmentVariables e
-    let proc        = CreateProcess (RawCommand rawExec rawArgs) (pure cdr) (pure childEnv) CreatePipe Inherit Inherit False False False False False False Nothing Nothing False
+      Success x -> pure . over (mapped . both) T.unpack $ x
+      Failure e -> left $ MissingEnvironmentVariables e
+    let proc        = CreateProcess (RawCommand (rawExec cmd) rawArgs) (pure cdr) (pure childEnv) CreatePipe Inherit Inherit False False False False False False Nothing Nothing False
     let open        = (liftIO $ createProcess proc)
     let close       = \(_, _, _, p) -> (liftIO $ waitForProcess p)
     flip catch handler . ebracket open close $ \(Just inp, _, _, p) -> do
