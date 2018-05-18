@@ -40,7 +40,7 @@ library
                     ,   ultra-text
                     ,   unix                    == 2.7.*
                     ,   unordered-containers    == 0.2.*
-                    ,   validation              == 0.6.*
+                    ,   validation              >= 0.6         && < 1.1
 
     ghc-options:        -Wall
 
