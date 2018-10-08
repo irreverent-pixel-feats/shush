@@ -4,7 +4,7 @@ license:            BSD3
 license-file:       LICENSE.md
 author:             Dom De Re
 maintainer:         Dom De Re
-copyright:          Copyright (C) 2017 Irreverent Pixel Feats
+copyright:          Copyright (C) 2017-2018 Irreverent Pixel Feats
 synopsis:           Shell out library that wraps around process
 category:           Data
 description:        Shell out library that wraps around process
@@ -30,7 +30,7 @@ library
                     ,   array
                     ,   bytestring              == 0.10.*
                     ,   directory               >= 1.2          && < 1.4
-                    ,   mmorph                  == 1.0.*
+                    ,   mmorph                  == 1.1.*
                     ,   domdere-preamble
                     ,   process                 == 1.6.*
                     ,   transformers            > 0.3           && <= 0.6
