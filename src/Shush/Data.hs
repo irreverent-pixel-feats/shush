@@ -18,6 +18,7 @@ module Shush.Data (
   , InStream(..)
   , OutStream(..)
   , ErrStream(..)
+  , ProcessHandle(..)
   -- * Functions
   , inHandle
   , errHandle
@@ -38,6 +39,8 @@ import qualified Ultra.Data.Text as T
 
 import System.IO ( Handle )
 import System.IO.Error ( IOError )
+
+import qualified System.Process as P
 
 import Preamble
 
@@ -74,6 +77,10 @@ data ShellCommand = ShellCommand {
 newtype InStream    = InStream Handle deriving (Show, Eq)
 newtype OutStream   = OutStream Handle deriving (Show, Eq)
 newtype ErrStream   = ErrStream Handle deriving (Show, Eq)
+
+newtype ProcessHandle = ProcessHandle {
+    unProcessHandle :: P.ProcessHandle
+  }
 
 inHandle :: InStream -> Handle
 inHandle (InStream h) = h
