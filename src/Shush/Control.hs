@@ -257,7 +257,7 @@ checkProcessStatus
   :: (MonadIO m)
   => ProcessHandle
   -> m ProcessStatus
-checkProcessStatus p =
+checkProcessStatus (ProcessHandle p) =
   flip fmap (liftIO (getProcessExitCode p)) $ \case
     Nothing -> StillRunning
     Just (ExitFailure c) -> ProcessFailed c
