@@ -55,6 +55,7 @@ import System.Process (
     CmdSpec(..)
   , CreateProcess(..)
   , StdStream(..)
+  , checkProcessStatus
   , createProcess
   , interruptProcessGroupOf
   , waitForProcess
@@ -251,6 +252,16 @@ withInputStreamASync cmd' = do
   (Just inp, _, _, p) <-  startProcess cmd' withInputStreamProc
   pure (InStream inp, p)
 
+checkProcessStatus
+  :: (MonadIO m)
+  => ProcessHandle
+  -> m ProcessStatus
+checkProcessStatus p =
+  flip fmap (liftIO (getProcessExitCode p)) $ \case
+    Nothing -> StillRunning
+    Just (ExitFailure c) -> ProcessFailed c
+    Just ExitSuccess -> ProcessFinishedCleanly
+  
 -- Wait for process to exit and handle the exit code
 waitAndTranslateExitCode
   :: (MonadCatch m, MonadIO m)
