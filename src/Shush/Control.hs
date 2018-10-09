@@ -13,6 +13,7 @@ module Shush.Control (
   -- * Types
     ShT
   -- * Functions
+  , checkProcessStatus
   , interruptAndWaitProcess
   , readStderr
   , readStdout
@@ -55,7 +56,6 @@ import System.Process (
     CmdSpec(..)
   , CreateProcess(..)
   , StdStream(..)
-  , checkProcessStatus
   , createProcess
   , interruptProcessGroupOf
   , waitForProcess
