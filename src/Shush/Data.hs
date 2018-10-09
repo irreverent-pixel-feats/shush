@@ -89,7 +89,8 @@ newtype ProcessHandle = ProcessHandle {
 -- 
 data ProcessStatus =
     StillRunning
-  | ExitedWithCode !Int
+  | ProcessFailed !Int
+  | ProcessFinishedCleanly
     deriving (Show, Eq)
 
 inHandle :: InStream -> Handle
