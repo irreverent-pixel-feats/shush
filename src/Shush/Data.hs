@@ -19,6 +19,7 @@ module Shush.Data (
   , OutStream(..)
   , ErrStream(..)
   , ProcessHandle(..)
+  , ProcessStatus(..)
   -- * Functions
   , inHandle
   , errHandle
@@ -81,6 +82,15 @@ newtype ErrStream   = ErrStream Handle deriving (Show, Eq)
 newtype ProcessHandle = ProcessHandle {
     unProcessHandle :: P.ProcessHandle
   }
+
+-- |
+-- You can query the status of a process,
+-- It is either still running or has exited with an exit code.
+-- 
+data ProcessStatus =
+    StillRunning
+  | ExitedWithCode !Int
+    deriving (Show, Eq)
 
 inHandle :: InStream -> Handle
 inHandle (InStream h) = h
