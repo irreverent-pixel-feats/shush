@@ -57,6 +57,7 @@ import System.Process (
   , CreateProcess(..)
   , StdStream(..)
   , createProcess
+  , getProcessExitCode
   , interruptProcessGroupOf
   , waitForProcess
   )
