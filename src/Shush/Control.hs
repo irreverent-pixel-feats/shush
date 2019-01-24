@@ -32,7 +32,6 @@ module Shush.Control (
 import Shush.Data
 import Shush.Data.Environment
 
---import Ultra.Control.Lens ( Lens', Traversal', (.=), both, over, mapped, lens, selected, use, view )
 import Ultra.Control.Lens ((.=), both, over, mapped, use)
 import Ultra.Control.Monad.Bracket (MonadBracket(..), ebracket, liftSVBracket)
 import Ultra.Control.Monad.Catch (MonadCatch(..), MonadThrow(..))
@@ -262,7 +261,7 @@ checkProcessStatus (ProcessHandle p) =
     Nothing -> StillRunning
     Just (ExitFailure c) -> ProcessFailed c
     Just ExitSuccess -> ProcessFinishedCleanly
-  
+
 -- Wait for process to exit and handle the exit code
 waitAndTranslateExitCode
   :: (MonadCatch m, MonadIO m)
