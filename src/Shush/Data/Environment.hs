@@ -59,12 +59,18 @@ buildChildEnvironmentFromParent
   -> Validation (NonEmpty T.Text) [(T.Text, T.Text)]
 buildChildEnvironmentFromParent = _buildChildEnvironmentFromParent
 
+instance Semigroup ChildEnvironment where
+  --(<>) :: a -> a -> a
+  (<>) (ChildEnvironment f) (ChildEnvironment g) = ChildEnvironment $ \parentEnv ->
+    (<>) <$> f parentEnv <*> g parentEnv
+
+
 instance Monoid ChildEnvironment where
 --mempty :: a
   mempty = ChildEnvironment . const . pure $ []
 
---mappend :: a -> a -> a
-  mappend (ChildEnvironment f) (ChildEnvironment g) = ChildEnvironment $ \parentEnv ->
+  --mappend :: a -> a -> a
+  (mappend) (ChildEnvironment f) (ChildEnvironment g) = ChildEnvironment $ \parentEnv ->
     (<>) <$> f parentEnv <*> g parentEnv
 
 -- | A var from the Parent environment is mapped to a var in the child environment

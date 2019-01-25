@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE StrictData #-}
 -------------------------------------------------------------------
 -- |
 -- Module       : Shush.Data
@@ -33,7 +34,7 @@ module Shush.Data (
   , inputStream
   ) where
 
-import Shush.Data.Environment
+import Shush.Data.Environment ( ChildEnvironment )
 
 import Ultra.Control.Lens ( Lens', Traversal', lens, selected )
 import qualified Ultra.Data.Text as T
@@ -46,33 +47,45 @@ import qualified System.Process as P
 import Preamble
 
 data SyncShellError =
-    CallFailed !IOError
-  | CommandFailed !Int
-  | DirectoryDoesNotExist !T.Text
-  | MissingEnvironmentVariables !(NonEmpty T.Text)
+    CallFailed IOError
+  | CommandFailed Int
+  | DirectoryDoesNotExist T.Text
+  | MissingEnvironmentVariables (NonEmpty T.Text)
     deriving (Show, Eq)
 
+-- |
+-- Execution context for running a shell command.
+--
 data ShellContext = ShellContext {
     _cwd    :: T.Text
   , _env    :: [(T.Text, T.Text)]
   , _stdin  :: Maybe InStream
   } deriving (Show, Eq)
 
+-- |
+-- Encodes the different types of shell commands supported.
+--
 data ShellCommandArg =
     RawArg T.Text
   | QuoteEnclosed T.Text
   | DoubleQuoteEnclosed T.Text
     deriving (Show, Eq)
 
+-- |
+-- Correctly render 'ShellCommandArg' as 'Text' suitable for running in a POSIX shell.
+--
 textArg :: ShellCommandArg -> T.Text
 textArg (RawArg t)              = t
 textArg (QuoteEnclosed t)       = T.bracketed "'" "'" t
 textArg (DoubleQuoteEnclosed t) = T.bracketed "\"" "\"" t
 
+-- |
+-- Details for how to call a shell command, includes the arguments and environment.
+--
 data ShellCommand = ShellCommand {
-    shellEnv        :: !ChildEnvironment
-  , shellBin        :: !T.Text
-  , shellCmdArgs    :: ![ShellCommandArg]
+    shellEnv        :: ChildEnvironment
+  , shellBin        :: T.Text
+  , shellCmdArgs    :: [ShellCommandArg]
   }
 
 newtype InStream    = InStream Handle deriving (Show, Eq)
@@ -86,10 +99,10 @@ newtype ProcessHandle = ProcessHandle {
 -- |
 -- You can query the status of a process,
 -- It is either still running or has exited with an exit code.
--- 
+--
 data ProcessStatus =
     StillRunning
-  | ProcessFailed !Int
+  | ProcessFailed Int
   | ProcessFinishedCleanly
     deriving (Show, Eq)
 
@@ -102,6 +115,8 @@ outHandle (OutStream h) = h
 errHandle :: ErrStream -> Handle
 errHandle (ErrStream h) = h
 
+-- | Render a 'SyncShellError' as text.
+--
 renderSyncShellError :: SyncShellError -> T.Text
 renderSyncShellError (CallFailed e)                     = "IO Error: " <> (T.pack . show $ e)
 renderSyncShellError (CommandFailed code)               = "Received non-zero error code: " <> (T.pack . show $ code)
@@ -121,5 +136,3 @@ inputStream = lens _stdin $ \c sin -> c { _stdin = sin }
 --
 envvar :: T.Text -> Traversal' ShellContext T.Text
 envvar n = environment . traverse . selected (== n)
-
-
