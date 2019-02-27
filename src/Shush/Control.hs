@@ -22,6 +22,11 @@ module Shush.Control (
   , runShTEitherT
   , runSync
   , useInputStream
+  , waitAndReturnExitCode
+  , waitAndTranslateExitCode
+  , waitForProcess
+  , withProcess
+  , withProcessEither
   , withCwd
   , withInputStream
   , withInputStreamASync
@@ -33,7 +38,7 @@ import Shush.Data
 import Shush.Data.Environment
 
 import Ultra.Control.Lens ((.=), both, over, mapped, use)
-import Ultra.Control.Monad.Bracket (MonadBracket(..), ebracket, liftSVBracket)
+import Ultra.Control.Monad.Bracket (MonadBracket(..), bracket', ebracket, liftSVBracket)
 import Ultra.Control.Monad.Catch (MonadCatch(..), MonadThrow(..))
 import Ultra.Control.Monad.Trans.Either (EitherT, left, runEitherT)
 import qualified Ultra.Data.Text as T
@@ -142,7 +147,7 @@ runSync
   -> ShT m ()
 runSync cmd = do
     (_, _, _, p) <- startProcess cmd runProc
-    ShT $ waitAndTranslateExitCode p
+    ShT $ waitAndTranslateExitCode' p
 
 runASync
   :: (MonadIO m, MonadCatch m)
@@ -182,7 +187,7 @@ withProcOutPipes cmd' f = do
     let open                              = _runShT $ startProcess cmd' withProcOutPipesProc
     let close (_, _, _, ProcessHandle p)  = liftIO $ waitForProcess p
     ShT . flip catch handler . ebracket open close $ \(_, Just outp, Just errp, p) ->
-      _runShT (f (OutStream outp) (ErrStream errp)) <* waitAndTranslateExitCode p
+      _runShT (f (OutStream outp) (ErrStream errp)) <* waitAndTranslateExitCode' p
 
 withProcOutPipesASync
   :: (MonadIO m, MonadBracket m, MonadCatch m)
@@ -242,7 +247,7 @@ withInputStream cmd' f = do
     -- But from looking at the implementation for `waitForProcess` i think its ok,
     -- seems to handle the case where its already closed...
     -- At the time of this writing it also seemed to work fine in practice...
-    _runShT (f $ InStream inp) <* waitAndTranslateExitCode p
+    _runShT (f $ InStream inp) <* waitAndTranslateExitCode' p
 
 withInputStreamASync
   :: (MonadIO m, MonadBracket m, MonadCatch m)
@@ -251,6 +256,20 @@ withInputStreamASync
 withInputStreamASync cmd' = do
   (Just inp, _, _, p) <-  startProcess cmd' withInputStreamProc
   pure (InStream inp, p)
+
+withProcess
+  :: (MonadIO m, MonadBracket m, MonadCatch m)
+  => ShellCommand
+  -> (ProcessHandle -> ShT m a)
+  -> ShT m a
+withProcess cmd' = bracket' (runASync cmd') waitAndTranslateExitCode
+
+withProcessEither
+  :: (MonadIO m, MonadBracket m, MonadCatch m)
+  => ShellCommand
+  -> (ProcessHandle -> EitherT e (ShT m) a)
+  -> EitherT e (ShT m) a
+withProcessEither cmd' = ebracket (lift $ runASync cmd') (lift . waitAndTranslateExitCode)
 
 checkProcessStatus
   :: (MonadIO m)
@@ -263,14 +282,36 @@ checkProcessStatus (ProcessHandle p) =
     Just ExitSuccess -> ProcessFinishedCleanly
 
 -- Wait for process to exit and handle the exit code
-waitAndTranslateExitCode
+waitAndTranslateExitCode'
   :: (MonadCatch m, MonadIO m)
   => ProcessHandle
   -> EitherT SyncShellError m ()
-waitAndTranslateExitCode (ProcessHandle p) =
+waitAndTranslateExitCode' (ProcessHandle p) =
   liftIO (waitForProcess p) `catch` handler >>= \case
     ExitFailure c   -> left $ CommandFailed c
     ExitSuccess     -> pure ()
+
+waitAndReturnExitCode'
+  :: (MonadCatch m, MonadIO m)
+  => ProcessHandle
+  -> EitherT SyncShellError m (Either Int ())
+waitAndReturnExitCode' (ProcessHandle p) =
+  liftIO (waitForProcess p) `catch` handler >>= \case
+    ExitFailure c -> pure (Left c)
+    ExitSuccess   -> pure . pure $ ()
+
+waitAndReturnExitCode
+  :: (MonadCatch m, MonadIO m)
+  => ProcessHandle
+  -> ShT m (Either Int ())
+waitAndReturnExitCode =
+  ShT . waitAndReturnExitCode'
+
+waitAndTranslateExitCode
+  :: (MonadCatch m, MonadIO m)
+  => ProcessHandle
+  -> ShT m ()
+waitAndTranslateExitCode = ShT . waitAndTranslateExitCode'
 
 interruptAndWaitProcess
   :: (MonadCatch m, MonadIO m)
